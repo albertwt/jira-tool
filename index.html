@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Draftless — Jira Story Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #1e1f2e;
+    --surface: #252638;
+    --surface2: #2e3047;
+    --surface3: #363854;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --purple: #7c6ff7;
+    --purple-light: #a89ff9;
+    --purple-dim: rgba(124,111,247,0.15);
+    --pink: #f472b6;
+    --pink-dim: rgba(244,114,182,0.12);
+    --teal: #2dd4bf;
+    --teal-dim: rgba(45,212,191,0.12);
+    --amber: #fbbf24;
+    --amber-dim: rgba(251,191,36,0.12);
+    --green: #4ade80;
+    --green-dim: rgba(74,222,128,0.12);
+    --text: #f0f0f8;
+    --text-muted: #9294b0;
+    --text-dim: #6264a0;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .bg-blobs {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+  }
+  .blob {
+    position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.18;
+  }
+  .blob-1 { width: 500px; height: 500px; background: #7c6ff7; top: -150px; right: -100px; }
+  .blob-2 { width: 400px; height: 400px; background: #f472b6; bottom: -100px; left: -80px; }
+  .blob-3 { width: 300px; height: 300px; background: #2dd4bf; top: 40%; left: 40%; }
+
+  .container {
+    position: relative; z-index: 1;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  header {
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .logo {
+    width: 48px; height: 48px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--purple), var(--pink));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+    box-shadow: 0 4px 20px rgba(124,111,247,0.4);
+  }
+
+  .header-text h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 26px; font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #f0f0f8 30%, var(--purple-light));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+
+  .header-text p {
+    font-size: 14px; color: var(--text-muted); margin-top: 2px;
+  }
+
+  .badge {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;
+    padding: 3px 10px; border-radius: 20px;
+    background: var(--purple-dim); color: var(--purple-light);
+    border: 1px solid rgba(124,111,247,0.25);
+    margin-left: auto; white-space: nowrap;
+  }
+
+  /* TAB SWITCHER */
+  .tab-bar {
+    display: flex; gap: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px;
+    margin-bottom: 20px;
+  }
+
+  .tab-btn {
+    flex: 1;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px; font-weight: 700;
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    border: none; cursor: pointer;
+    background: transparent;
+    color: var(--text-muted);
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    letter-spacing: 0.2px;
+  }
+
+  .tab-btn:hover { color: var(--text); background: var(--surface2); }
+
+  .tab-btn.active {
+    background: linear-gradient(135deg, var(--purple), #9f6ef5);
+    color: #fff;
+    box-shadow: 0 2px 12px rgba(124,111,247,0.35);
+  }
+
+  .tab-btn.active-generate {
+    background: linear-gradient(135deg, var(--teal), #22d3ee);
+    color: #0f1720;
+    box-shadow: 0 2px 12px rgba(45,212,191,0.35);
+  }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* SHARED CARD STYLES */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+
+  .card-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .card-label .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--purple);
+    box-shadow: 0 0 6px var(--purple);
+  }
+
+  .card-label .dot-teal {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--teal);
+    box-shadow: 0 0 6px var(--teal);
+  }
+
+  textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+    padding: 16px;
+    resize: vertical;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+
+  textarea::placeholder { color: var(--text-dim); }
+  textarea:focus { border-color: rgba(124,111,247,0.5); }
+
+  .textarea-review { min-height: 220px; }
+  .textarea-blob { min-height: 260px; }
+
+  /* STORY TYPE CHIPS */
+  .story-type-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-top: 20px; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .story-type-label .optional-tag {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 400; text-transform: none;
+    letter-spacing: 0; font-size: 11px;
+    color: var(--text-dim);
+    background: var(--surface3);
+    padding: 2px 8px; border-radius: 4px;
+  }
+
+  .story-type-row {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-top: 0;
+  }
+
+  .type-chip {
+    font-size: 13px; font-weight: 500;
+    font-family: 'DM Sans', sans-serif;
+    padding: 7px 18px; border-radius: 999px;
+    border: 1.5px solid var(--border2);
+    color: var(--text-muted);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+
+  .type-chip:hover {
+    border-color: var(--teal);
+    color: var(--teal);
+  }
+
+  .type-chip.selected {
+    background: var(--teal-dim);
+    border-color: var(--teal);
+    color: var(--teal);
+  }
+
+  /* ATTACHMENT AREA */
+  .attach-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-top: 20px; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .attach-label .optional-tag {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 400; text-transform: none;
+    letter-spacing: 0; font-size: 11px;
+    color: var(--text-dim);
+    background: var(--surface3);
+    padding: 2px 8px; border-radius: 4px;
+  }
+
+  .attach-drop-zone {
+    border: 1.5px dashed var(--border2);
+    border-radius: var(--radius-sm);
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface2);
+    position: relative;
+  }
+
+  .attach-drop-zone:hover,
+  .attach-drop-zone.drag-over {
+    border-color: rgba(45,212,191,0.4);
+    background: rgba(45,212,191,0.05);
+  }
+
+  .attach-drop-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+
+  /* VOICE BUTTON */
+  .textarea-wrapper { position: relative; }
+
+  .voice-btn {
+    position: absolute; bottom: 12px; right: 12px;
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 1.5px solid var(--teal);
+    background: var(--teal-dim);
+    color: var(--teal);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    z-index: 2;
+  }
+
+  .voice-btn:hover { background: rgba(45,212,191,0.2); }
+
+  .voice-btn.recording {
+    background: rgba(244,114,182,0.15);
+    border-color: var(--pink);
+    color: var(--pink);
+    animation: mic-pulse 1.2s ease-in-out infinite;
+  }
+
+  @keyframes mic-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(244,114,182,0.3); }
+    50% { box-shadow: 0 0 0 6px rgba(244,114,182,0); }
+  }
+
+  .voice-status {
+    font-size: 12px; color: var(--text-dim);
+    margin-top: 6px; min-height: 18px;
+    transition: color 0.2s;
+  }
+
+  .voice-status.active { color: var(--pink); }
+
+  .attach-drop-icon { font-size: 22px; margin-bottom: 6px; }
+
+  .attach-drop-text {
+    font-size: 13px; color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .attach-drop-text span { color: var(--teal); font-weight: 600; }
+
+  .attach-drop-sub {
+    font-size: 11px; color: var(--text-dim); margin-top: 4px;
+  }
+
+  .attach-list {
+    display: flex; flex-direction: column; gap: 8px; margin-top: 10px;
+  }
+
+  .attach-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+  }
+
+  .attach-item-icon { font-size: 16px; flex-shrink: 0; }
+  .attach-item-name { flex: 1; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .attach-item-size { font-size: 11px; color: var(--text-dim); flex-shrink: 0; }
+
+  .attach-remove {
+    background: none; border: none; color: var(--text-dim);
+    cursor: pointer; font-size: 16px; padding: 0 2px;
+    transition: color 0.15s; flex-shrink: 0;
+  }
+  .attach-remove:hover { color: #f87171; }
+
+  .hint-row {
+    display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap;
+  }
+
+  .hint {
+    font-size: 12px; padding: 5px 12px; border-radius: 20px;
+    border: 1px solid var(--border2);
+    color: var(--text-muted);
+    background: var(--surface2);
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .hint-icon { font-size: 13px; }
+
+  .btn-row {
+    display: flex; align-items: center; gap: 12px; margin-top: 20px;
+  }
+
+  .btn-primary {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px; font-weight: 700;
+    padding: 14px 32px;
+    border-radius: var(--radius-sm);
+    border: none; cursor: pointer;
+    background: linear-gradient(135deg, var(--purple), #9f6ef5);
+    color: #fff;
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+    box-shadow: 0 4px 20px rgba(124,111,247,0.35);
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(124,111,247,0.5); }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn-generate {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px; font-weight: 700;
+    padding: 14px 32px;
+    border-radius: var(--radius-sm);
+    border: none; cursor: pointer;
+    background: linear-gradient(135deg, var(--teal), #22d3ee);
+    color: #0f1720;
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+    box-shadow: 0 4px 20px rgba(45,212,191,0.3);
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .btn-generate:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(45,212,191,0.45); }
+  .btn-generate:active { transform: scale(0.98); }
+  .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn-clear {
+    font-size: 14px; font-weight: 500;
+    padding: 14px 20px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .btn-clear:hover { background: var(--surface2); color: var(--text); }
+
+  /* LOADING */
+  .loading { display: none; text-align: center; padding: 40px; }
+  .loading.active { display: block; }
+
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--purple);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+
+  .spinner-teal { border-top-color: var(--teal); }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading p {
+    color: var(--text-muted); font-size: 14px;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+  /* REVIEW RESULTS */
+  .results { display: none; }
+  .results.active { display: block; }
+
+  .result-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .result-header h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px; font-weight: 800;
+  }
+
+  .result-header .score-pill {
+    margin-left: auto;
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 5px 14px; border-radius: 20px;
+  }
+
+  .score-needs-work { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(251,191,36,0.25); }
+  .score-good { background: var(--teal-dim); color: var(--teal); border: 1px solid rgba(45,212,191,0.25); }
+
+  .bucket {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+
+  .bucket-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .bucket-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; flex-shrink: 0;
+  }
+
+  .bucket-ac .bucket-icon { background: var(--purple-dim); }
+  .bucket-scope .bucket-icon { background: var(--pink-dim); }
+
+  .bucket-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px; font-weight: 700;
+  }
+
+  .bucket-ac .bucket-title { color: var(--purple-light); }
+  .bucket-scope .bucket-title { color: var(--pink); }
+
+  .bucket-count {
+    margin-left: auto;
+    font-size: 12px; font-weight: 600;
+    padding: 3px 10px; border-radius: 20px;
+    background: var(--surface3);
+    color: var(--text-muted);
+  }
+
+  .questions-list {
+    padding: 16px 20px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+
+  .question-item {
+    display: flex; gap: 12px;
+    padding: 14px 16px;
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s;
+  }
+
+  .question-item:hover { border-color: var(--border2); }
+
+  .q-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 12px; font-weight: 800;
+    width: 22px; height: 22px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px;
+  }
+
+  .bucket-ac .q-num { background: var(--purple-dim); color: var(--purple-light); }
+  .bucket-scope .q-num { background: var(--pink-dim); color: var(--pink); }
+
+  .q-text { font-size: 14px; line-height: 1.6; color: var(--text); }
+
+  .clean-bill { text-align: center; padding: 40px 20px; }
+  .clean-icon { font-size: 40px; margin-bottom: 12px; }
+  .clean-bill h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px; font-weight: 800;
+    color: var(--teal); margin-bottom: 8px;
+  }
+  .clean-bill p { font-size: 14px; color: var(--text-muted); max-width: 340px; margin: 0 auto; }
+
+  .try-again-row { margin-top: 24px; text-align: center; }
+
+  .btn-secondary {
+    font-size: 14px; font-weight: 600;
+    padding: 12px 24px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .btn-secondary:hover { background: var(--surface2); color: var(--text); border-color: rgba(124,111,247,0.4); }
+
+  /* GENERATED STORY OUTPUT */
+  .gen-output { display: none; }
+  .gen-output.active { display: block; }
+
+  .gen-result-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .gen-result-header h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px; font-weight: 800;
+  }
+
+  .gen-pill {
+    margin-left: auto;
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 5px 14px; border-radius: 20px;
+    background: var(--teal-dim); color: var(--teal);
+    border: 1px solid rgba(45,212,191,0.25);
+  }
+
+  .story-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+
+  .story-section-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-icon {
+    width: 28px; height: 28px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; flex-shrink: 0;
+  }
+
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--text-muted);
+  }
+
+  .section-summary { background: var(--teal-dim); }
+  .section-summary .section-icon { background: rgba(45,212,191,0.2); }
+  .section-summary .section-title { color: var(--teal); }
+
+  .section-ac .section-icon { background: var(--purple-dim); }
+  .section-ac .section-title { color: var(--purple-light); }
+
+  .section-deps .section-icon { background: var(--amber-dim); }
+  .section-deps .section-title { color: var(--amber); }
+
+  .section-open .section-icon { background: var(--pink-dim); }
+  .section-open .section-title { color: var(--pink); }
+
+  .section-lead .section-icon { background: var(--green-dim); }
+  .section-lead .section-title { color: var(--green); }
+
+  .story-section-body {
+    padding: 16px 20px;
+  }
+
+  .story-summary-text {
+    font-family: 'Syne', sans-serif;
+    font-size: 16px; font-weight: 700;
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  .story-list {
+    display: flex; flex-direction: column; gap: 10px;
+  }
+
+  .story-list-item {
+    display: flex; gap: 10px;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    font-size: 14px; line-height: 1.6;
+    color: var(--text);
+  }
+
+  .list-bullet {
+    color: var(--text-dim);
+    flex-shrink: 0;
+    margin-top: 2px;
+    font-size: 16px;
+  }
+
+  .open-flag {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--pink);
+    background: var(--pink-dim);
+    border: 1px solid rgba(244,114,182,0.2);
+    padding: 2px 8px; border-radius: 4px;
+    display: inline-block; margin-right: 8px;
+    white-space: nowrap;
+  }
+
+  .copy-btn {
+    font-size: 12px; font-weight: 600;
+    padding: 6px 14px; border-radius: 6px;
+    border: 1px solid var(--border2);
+    background: transparent; color: var(--text-muted);
+    cursor: pointer; transition: all 0.15s;
+    font-family: 'DM Sans', sans-serif;
+    margin-left: auto;
+  }
+  .copy-btn:hover { background: var(--surface3); color: var(--text); }
+
+  .tech-lead-note {
+    background: var(--green-dim);
+    border: 1px solid rgba(74,222,128,0.2);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    margin-top: 16px;
+    display: flex; gap: 10px;
+    font-size: 13px; line-height: 1.6; color: var(--text-muted);
+  }
+
+  .tech-lead-note strong { color: var(--green); }
+
+  .gen-actions {
+    display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;
+  }
+
+  .error-box {
+    display: none;
+    background: rgba(227,72,72,0.1);
+    border: 1px solid rgba(227,72,72,0.25);
+    border-radius: var(--radius-sm);
+    padding: 14px 18px;
+    color: #f87171;
+    font-size: 14px;
+    margin-top: 16px;
+  }
+
+  .error-box.active { display: block; }
+
+  footer {
+    text-align: center;
+    margin-top: 60px;
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+
+  footer span { color: var(--purple-light); }
+</style>
+</head>
+<body>
+
+<div class="bg-blobs">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+
+<div class="container">
+
+  <header>
+    <div class="logo">✦</div>
+    <div class="header-text">
+      <h1>Draftless</h1>
+      <p>Review & generate Jira stories that survive grooming</p>
+    </div>
+    <div class="badge">PDM Tool</div>
+  </header>
+
+  <!-- TAB BAR -->
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-review" onclick="switchTab('review')">
+      ✓ Review My Draft
+    </button>
+    <button class="tab-btn" id="tab-generate" onclick="switchTab('generate')">
+      ✦ Generate from Text
+    </button>
+  </div>
+
+  <!-- ===================== REVIEW TAB ===================== -->
+  <div class="tab-panel active" id="panel-review">
+
+    <div id="review-input-section">
+      <div class="card">
+        <div class="card-label">
+          <span class="dot"></span>
+          Your Jira Story Draft
+        </div>
+        <textarea
+          id="story-input"
+          class="textarea-review"
+          placeholder="Paste your Jira story draft here — summary, acceptance criteria, scope, whatever you have so far. The rougher the better.
+
+Example:
+As a Digital Production author, I want to configure a sticky banner component that supports web-specific fields so that the banner can be authored and published for web environments.
+
+Acceptance Criteria:
+- Component supports web URL configuration
+- Fields align with existing app sticky banner
+- Published successfully to CaaS"
+        ></textarea>
+
+        <div class="hint-row">
+          <div class="hint"><span class="hint-icon">✦</span> No tech details needed — your tech lead owns those</div>
+          <div class="hint"><span class="hint-icon">✦</span> Dependencies skipped by design</div>
+          <div class="hint"><span class="hint-icon">✦</span> Max 2-3 questions per bucket</div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-primary" id="review-btn" onclick="reviewStory()">
+          <span>Review My Story</span>
+          <span>→</span>
+        </button>
+        <button class="btn-clear" onclick="clearReview()">Clear</button>
+      </div>
+
+      <div class="error-box" id="review-error-box"></div>
+    </div>
+
+    <div class="loading" id="review-loading">
+      <div class="spinner"></div>
+      <p>Reading your story...</p>
+    </div>
+
+    <div class="results" id="review-results">
+      <div class="result-header">
+        <h2>Here's what I'd ask in grooming</h2>
+        <div class="score-pill score-needs-work" id="score-pill">Questions to address</div>
+      </div>
+
+      <div id="ac-bucket" class="bucket bucket-ac">
+        <div class="bucket-header">
+          <div class="bucket-icon">✓</div>
+          <div class="bucket-title">Acceptance Criteria</div>
+          <div class="bucket-count" id="ac-count">0 questions</div>
+        </div>
+        <div class="questions-list" id="ac-questions"></div>
+      </div>
+
+      <div id="scope-bucket" class="bucket bucket-scope">
+        <div class="bucket-header">
+          <div class="bucket-icon">⊡</div>
+          <div class="bucket-title">Scope</div>
+          <div class="bucket-count" id="scope-count">0 questions</div>
+        </div>
+        <div class="questions-list" id="scope-questions"></div>
+      </div>
+
+      <div class="try-again-row">
+        <button class="btn-secondary" onclick="resetReview()">← Review another story</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===================== GENERATE TAB ===================== -->
+  <div class="tab-panel" id="panel-generate">
+
+    <div id="gen-input-section">
+      <div class="card">
+        <div class="card-label">
+          <span class="dot-teal"></span>
+          Raw Requirements Blob
+        </div>
+        <div class="textarea-wrapper">
+          <textarea
+            id="blob-input"
+            class="textarea-blob"
+            placeholder="Paste anything — meeting notes, Slack threads, Figma comments, your brain dump. Messy is fine. Claude will extract what matters.
+
+Example:
+so for card media we need to support sponsored tags from collective API — not authored, just toggled. product category tags on top left, legal/sponsored top right. compact vs expanded should be a dropdown in dialog. John said if add to cart is checked = direct action, not checked = nav. figma link is [URL]. not sure if we still need designType field for this..."
+          ></textarea>
+          <button class="voice-btn" id="voice-btn" title="Speak your requirements" onclick="toggleVoice()">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="4.5" y="1" width="5" height="7" rx="2.5" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M2 7.5c0 2.761 2.239 4.5 5 4.5s5-1.739 5-4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              <line x1="7" y1="12" x2="7" y2="13.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+        <div class="voice-status" id="voice-status"></div>
+
+        <div class="story-type-label">
+          <span class="dot-teal"></span>
+          Story Type
+          <span class="optional-tag">optional — Claude will infer if blank</span>
+        </div>
+        <div class="story-type-row" id="story-type-chips">
+          <div class="type-chip" onclick="toggleChip(this)">AEM Dev</div>
+          <div class="type-chip" onclick="toggleChip(this)">API Dev</div>
+          <div class="type-chip" onclick="toggleChip(this)">AEM QA</div>
+          <div class="type-chip" onclick="toggleChip(this)">API QA</div>
+          <div class="type-chip" onclick="toggleChip(this)">Authoring</div>
+          <div class="type-chip" onclick="toggleChip(this)">Epic</div>
+        </div>
+
+        <div class="attach-label">
+          <span class="dot-teal"></span>
+          Attachments
+        </div>
+        <div class="attach-drop-zone" id="attach-zone">
+          <input type="file" id="attach-input" multiple accept="*/*" onchange="handleFiles(this.files)">
+          <div class="attach-drop-icon">📎</div>
+          <div class="attach-drop-text">Drop files here or <span>browse</span></div>
+          <div class="attach-drop-sub">Screenshots, PDFs, Figma exports, videos — all fine, all optional</div>
+        </div>
+        <div class="attach-list" id="attach-list"></div>
+
+        <div class="hint-row" style="margin-top: 16px;">
+          <div class="hint"><span class="hint-icon">✦</span> Tech details won't be inferred — only what you paste</div>
+          <div class="hint"><span class="hint-icon">✦</span> Open questions flagged, not guessed</div>
+          <div class="hint"><span class="hint-icon">✦</span> Runs through your writing style automatically</div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-generate" id="generate-btn" onclick="generateStory()">
+          <span>Generate Story</span>
+          <span>→</span>
+        </button>
+        <button class="btn-clear" onclick="clearGenerate()">Clear</button>
+      </div>
+
+      <div class="error-box" id="gen-error-box"></div>
+    </div>
+
+    <div class="loading" id="gen-loading">
+      <div class="spinner spinner-teal"></div>
+      <p>Turning your blob into a story...</p>
+    </div>
+
+    <div class="gen-output" id="gen-output">
+      <div class="gen-result-header">
+        <h2>Your story draft</h2>
+        <div class="gen-pill" id="gen-type-pill">Story</div>
+      </div>
+
+      <div class="story-section section-summary" id="out-summary-section">
+        <div class="story-section-header">
+          <div class="section-icon">📌</div>
+          <div class="section-title">Summary</div>
+        </div>
+        <div class="story-section-body">
+          <div class="story-summary-text" id="out-summary"></div>
+        </div>
+      </div>
+
+      <div class="story-section section-ac" id="out-ac-section">
+        <div class="story-section-header">
+          <div class="section-icon">✓</div>
+          <div class="section-title">Acceptance Criteria</div>
+        </div>
+        <div class="story-section-body">
+          <div class="story-list" id="out-ac"></div>
+        </div>
+      </div>
+
+      <div class="story-section section-deps" id="out-deps-section">
+        <div class="story-section-header">
+          <div class="section-icon">🔗</div>
+          <div class="section-title">Dependencies</div>
+        </div>
+        <div class="story-section-body">
+          <div class="story-list" id="out-deps"></div>
+        </div>
+      </div>
+
+      <div class="story-section section-open" id="out-open-section">
+        <div class="story-section-header">
+          <div class="section-icon">⚠</div>
+          <div class="section-title">Open Questions</div>
+        </div>
+        <div class="story-section-body">
+          <div class="story-list" id="out-open"></div>
+        </div>
+      </div>
+
+      <div class="story-section section-lead" id="out-lead-section">
+        <div class="story-section-header">
+          <div class="section-icon">💬</div>
+          <div class="section-title">Confirm with Tech Lead Before Grooming</div>
+        </div>
+        <div class="story-section-body">
+          <div class="story-list" id="out-lead"></div>
+        </div>
+      </div>
+
+      <div class="gen-actions">
+        <button class="btn-secondary" onclick="resetGenerate()">← Generate another story</button>
+        <button class="btn-secondary" onclick="switchTab('review')" style="border-color: rgba(124,111,247,0.3); color: var(--purple-light);">→ Run Review Check</button>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    Built for PDMs who write stories that survive grooming &mdash; powered by <span>Claude</span>
+  </footer>
+
+</div>
+
+<script>
+
+// ==================== TAB SWITCHING ====================
+
+function switchTab(tab) {
+  document.getElementById('tab-review').classList.remove('active', 'active-generate');
+  document.getElementById('tab-generate').classList.remove('active', 'active-generate');
+  document.getElementById('panel-review').classList.remove('active');
+  document.getElementById('panel-generate').classList.remove('active');
+
+  if (tab === 'review') {
+    document.getElementById('tab-review').classList.add('active');
+    document.getElementById('panel-review').classList.add('active');
+  } else {
+    document.getElementById('tab-generate').classList.add('active', 'active-generate');
+    document.getElementById('panel-generate').classList.add('active');
+  }
+}
+
+// ==================== ATTACHMENTS ====================
+
+let attachedFiles = [];
+
+// Drag and drop
+const dropZone = document.getElementById('attach-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  handleFiles(e.dataTransfer.files);
+});
+
+function handleFiles(fileList) {
+  for (const file of fileList) {
+    if (!attachedFiles.find(f => f.name === file.name && f.size === file.size)) {
+      attachedFiles.push(file);
+    }
+  }
+  renderAttachList();
+}
+
+function removeAttach(idx) {
+  attachedFiles.splice(idx, 1);
+  renderAttachList();
+}
+
+function renderAttachList() {
+  const list = document.getElementById('attach-list');
+  list.innerHTML = attachedFiles.map((f, i) => `
+    <div class="attach-item">
+      <span class="attach-item-icon">${fileIcon(f)}</span>
+      <span class="attach-item-name">${escapeHtml(f.name)}</span>
+      <span class="attach-item-size">${formatSize(f.size)}</span>
+      <button class="attach-remove" onclick="removeAttach(${i})" title="Remove">✕</button>
+    </div>
+  `).join('');
+}
+
+function fileIcon(f) {
+  const t = f.type;
+  if (t.startsWith('image/')) return '🖼️';
+  if (t.startsWith('video/')) return '🎬';
+  if (t === 'application/pdf') return '📄';
+  return '📎';
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+async function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result.split(',')[1]);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+async function buildAttachmentContent(files) {
+  const parts = [];
+  for (const file of files) {
+    if (file.type.startsWith('image/')) {
+      const b64 = await readFileAsBase64(file);
+      const mediaType = file.type;
+      parts.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } });
+      parts.push({ type: 'text', text: `[Attached image: ${file.name}]` });
+    } else if (file.type === 'application/pdf') {
+      const b64 = await readFileAsBase64(file);
+      parts.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } });
+      parts.push({ type: 'text', text: `[Attached PDF: ${file.name}]` });
+    } else {
+      // For video or other files just note them — API can't process raw video binary
+      parts.push({ type: 'text', text: `[Attached file: ${file.name} (${formatSize(file.size)}) — note: non-image/PDF attachments are referenced by name only]` });
+    }
+  }
+  return parts;
+}
+
+// ==================== STORY TYPE CHIPS ====================
+
+function toggleChip(el) {
+  if (el.classList.contains('selected')) {
+    el.classList.remove('selected');
+  } else {
+    document.querySelectorAll('.type-chip').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+}
+
+function getSelectedType() {
+  const selected = document.querySelector('.type-chip.selected');
+  return selected ? selected.textContent.trim() : null;
+}
+
+// ==================== VOICE INPUT ====================
+
+let recognition = null;
+let isRecording = false;
+let silenceTimer = null;
+const SILENCE_TIMEOUT = 5000;
+
+function resetSilenceTimer() {
+  clearTimeout(silenceTimer);
+  silenceTimer = setTimeout(() => {
+    if (isRecording && recognition) {
+      recognition.stop();
+      setVoiceStatus('Stopped — no speech detected for 5 seconds.', false);
+    }
+  }, SILENCE_TIMEOUT);
+}
+
+function toggleVoice() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    setVoiceStatus('Voice input not supported in this browser.', false);
+    return;
+  }
+
+  if (isRecording) {
+    clearTimeout(silenceTimer);
+    recognition.stop();
+    return;
+  }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+
+  let finalTranscript = '';
+
+  recognition.onstart = () => {
+    isRecording = true;
+    document.getElementById('voice-btn').classList.add('recording');
+    setVoiceStatus('Listening — auto-stops after 5s of silence.', true);
+    resetSilenceTimer();
+  };
+
+  recognition.onresult = (e) => {
+    resetSilenceTimer();
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i].transcript;
+      if (e.results[i].isFinal) finalTranscript += t + ' ';
+      else interim = t;
+    }
+    const blob = document.getElementById('blob-input');
+    const base = blob.dataset.base || '';
+    blob.value = base + finalTranscript + interim;
+  };
+
+  recognition.onerror = (e) => {
+    clearTimeout(silenceTimer);
+    setVoiceStatus('Error: ' + e.error, false);
+    stopRecording();
+  };
+
+  recognition.onend = () => {
+    clearTimeout(silenceTimer);
+    const blob = document.getElementById('blob-input');
+    blob.dataset.base = blob.value;
+    stopRecording();
+    if (blob.value.trim()) setVoiceStatus('Done — edit above or hit Generate.', false);
+    else setVoiceStatus('', false);
+  };
+
+  const blob = document.getElementById('blob-input');
+  blob.dataset.base = blob.value.length ? blob.value + ' ' : '';
+  finalTranscript = '';
+
+  recognition.start();
+}
+
+function stopRecording() {
+  isRecording = false;
+  document.getElementById('voice-btn').classList.remove('recording');
+}
+
+function setVoiceStatus(msg, active) {
+  const el = document.getElementById('voice-status');
+  el.textContent = msg;
+  el.classList.toggle('active', active);
+}
+
+// ==================== REVIEW LOGIC ====================
+
+const reviewSystemPrompt = `You are a thought partner reviewing a Jira story draft for a senior PDM.
+
+Your job is NOT to rewrite the story or fill in missing details.
+Your job is to ask the questions that expose gaps — things a dev or QA engineer would surface in grooming.
+
+Only ask questions based on what is actually missing or unclear in the draft. Do not infer, assume, or suggest answers. If something is already clear, skip it.
+Skip anything related to technical details or dependencies — the tech lead owns those.
+
+Respond ONLY with a valid JSON object. No markdown, no explanation, just the JSON.
+
+Format:
+{
+  "ac": ["question 1", "question 2"],
+  "scope": ["question 1", "question 2"]
+}
+
+Rules:
+- "ac" = Acceptance Criteria questions: is "done" specific and testable? Would a QA engineer know exactly what to verify?
+- "scope" = Scope questions: what is explicitly in vs out? What edge cases or variations are unaddressed?
+- Max 3 questions per bucket. Min 0 if the section is genuinely clear.
+- If both buckets are empty, return { "ac": [], "scope": [] }
+- Questions must be direct, specific to this story, and actionable.`;
+
+async function reviewStory() {
+  const input = document.getElementById('story-input').value.trim();
+  const errorBox = document.getElementById('review-error-box');
+  errorBox.classList.remove('active');
+
+  if (!input || input.length < 30) {
+    errorBox.textContent = 'Please paste a story draft — even a rough one is fine.';
+    errorBox.classList.add('active');
+    return;
+  }
+
+  document.getElementById('review-input-section').style.display = 'none';
+  document.getElementById('review-loading').classList.add('active');
+  document.getElementById('review-results').classList.remove('active');
+
+  try {
+    const response = await fetch('/api/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: reviewSystemPrompt,
+        messages: [{ role: 'user', content: `Here is the story draft:\n\n${input}` }]
+      })
+    });
+
+    const data = await response.json();
+    const raw = data.content?.[0]?.text || '';
+
+    let parsed;
+    try {
+      const clean = raw.replace(/```json|```/g, '').trim();
+      parsed = JSON.parse(clean);
+    } catch {
+      throw new Error('Could not parse response. Try again.');
+    }
+
+    const acQ = Array.isArray(parsed.ac) ? parsed.ac.slice(0, 3) : [];
+    const scopeQ = Array.isArray(parsed.scope) ? parsed.scope.slice(0, 3) : [];
+    const total = acQ.length + scopeQ.length;
+
+    document.getElementById('review-loading').classList.remove('active');
+
+    if (total === 0) {
+      document.getElementById('review-results').innerHTML = `
+        <div class="clean-bill">
+          <div class="clean-icon">✦</div>
+          <h3>Story looks solid</h3>
+          <p>No obvious gaps in acceptance criteria or scope based on what you've written. Ready to take into grooming.</p>
+        </div>
+        <div class="try-again-row">
+          <button class="btn-secondary" onclick="resetReview()">← Review another story</button>
+        </div>`;
+      document.getElementById('review-results').classList.add('active');
+      return;
+    }
+
+    const pill = document.getElementById('score-pill');
+    if (total <= 2) {
+      pill.className = 'score-pill score-good';
+      pill.textContent = 'Almost there';
+    } else {
+      pill.className = 'score-pill score-needs-work';
+      pill.textContent = `${total} questions to address`;
+    }
+
+    renderQuestions('ac-questions', 'ac-count', acQ);
+    renderQuestions('scope-questions', 'scope-count', scopeQ);
+
+    document.getElementById('ac-bucket').style.display = acQ.length ? 'block' : 'none';
+    document.getElementById('scope-bucket').style.display = scopeQ.length ? 'block' : 'none';
+
+    document.getElementById('review-results').classList.add('active');
+
+  } catch (err) {
+    document.getElementById('review-loading').classList.remove('active');
+    document.getElementById('review-input-section').style.display = 'block';
+    errorBox.textContent = 'Something went wrong: ' + err.message;
+    errorBox.classList.add('active');
+  }
+}
+
+function renderQuestions(containerId, countId, questions) {
+  const container = document.getElementById(containerId);
+  const countEl = document.getElementById(countId);
+  countEl.textContent = questions.length + (questions.length === 1 ? ' question' : ' questions');
+  container.innerHTML = questions.map((q, i) => `
+    <div class="question-item">
+      <div class="q-num">${i + 1}</div>
+      <div class="q-text">${escapeHtml(q)}</div>
+    </div>
+  `).join('');
+}
+
+function resetReview() {
+  document.getElementById('review-results').classList.remove('active');
+  document.getElementById('review-input-section').style.display = 'block';
+  document.getElementById('story-input').focus();
+}
+
+function clearReview() {
+  document.getElementById('story-input').value = '';
+  document.getElementById('review-error-box').classList.remove('active');
+  document.getElementById('story-input').focus();
+}
+
+// ==================== GENERATE LOGIC ====================
+
+const generateSystemPrompt = `You are a senior PM writing a Jira story on behalf of another senior PDM.
+
+Match their writing style: direct, no filler, action-oriented summary lines, specific testable AC bullets, open questions flagged clearly as OPEN: not buried in prose. Do not use generic story templates or add corporate filler.
+
+Do NOT infer technical details or fill in dependencies not mentioned in the input.
+
+Respond ONLY with a valid JSON object. No markdown, no explanation, just the JSON.
+
+Format:
+{
+  "storyType": "AEM Dev | API Dev | AEM QA | API QA | Authoring | Epic",
+  "summary": "Action-oriented one-line summary naming the component and what it does",
+  "ac": ["Specific, testable AC bullet 1", "AC bullet 2"],
+  "deps": ["Dependency 1 if mentioned", "Dependency 2 if mentioned"],
+  "open": ["OPEN: question about something unclear or missing"],
+  "techLead": ["Thing 1 to confirm with tech lead before grooming", "Thing 2"]
+}
+
+Rules:
+- summary: one line, action-oriented, names the component
+- ac: only include AC that is specific and testable — no vague language. Min 1, max 8.
+- deps: only if explicitly mentioned in input. Empty array if none.
+- open: only real unknowns from the input. Flag as "OPEN: [question]". Empty array if none.
+- techLead: exactly 1-2 things to confirm with tech lead before grooming. Always include this.
+- If a story type was specified in the input, use it. Otherwise infer from context.`;
+
+async function generateStory() {
+  const blob = document.getElementById('blob-input').value.trim();
+  const errorBox = document.getElementById('gen-error-box');
+  errorBox.classList.remove('active');
+
+  if (!blob || blob.length < 30) {
+    errorBox.textContent = 'Paste some requirements — even rough notes are fine.';
+    errorBox.classList.add('active');
+    return;
+  }
+
+  const selectedType = getSelectedType();
+  const typeNote = selectedType ? `\n\nStory type specified by user: ${selectedType}` : '';
+
+  document.getElementById('gen-input-section').style.display = 'none';
+  document.getElementById('gen-loading').classList.add('active');
+  document.getElementById('gen-output').classList.remove('active');
+
+  try {
+    // Build message content — text first, then attachments
+    const textContent = { type: 'text', text: `Here are my raw requirements:\n\n${blob}${typeNote}` };
+    const attachParts = await buildAttachmentContent(attachedFiles);
+    const messageContent = [textContent, ...attachParts];
+    const response = await fetch('/api/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: generateSystemPrompt,
+        messages: [{ role: 'user', content: messageContent }]
+      })
+    });
+
+    const data = await response.json();
+    const raw = data.content?.[0]?.text || '';
+
+    let parsed;
+    try {
+      const clean = raw.replace(/```json|```/g, '').trim();
+      parsed = JSON.parse(clean);
+    } catch {
+      throw new Error('Could not parse response. Try again.');
+    }
+
+    document.getElementById('gen-loading').classList.remove('active');
+    renderGeneratedStory(parsed);
+
+  } catch (err) {
+    document.getElementById('gen-loading').classList.remove('active');
+    document.getElementById('gen-input-section').style.display = 'block';
+    errorBox.textContent = 'Something went wrong: ' + err.message;
+    errorBox.classList.add('active');
+  }
+}
+
+function renderGeneratedStory(story) {
+  // Type pill
+  const pill = document.getElementById('gen-type-pill');
+  pill.textContent = story.storyType || 'Story';
+
+  // Summary
+  document.getElementById('out-summary').textContent = story.summary || '';
+
+  // AC
+  const acEl = document.getElementById('out-ac');
+  const acItems = Array.isArray(story.ac) ? story.ac : [];
+  acEl.innerHTML = acItems.map(item => `
+    <div class="story-list-item">
+      <span class="list-bullet">·</span>
+      <span>${escapeHtml(item)}</span>
+    </div>
+  `).join('');
+  document.getElementById('out-ac-section').style.display = acItems.length ? 'block' : 'none';
+
+  // Dependencies
+  const depsEl = document.getElementById('out-deps');
+  const depsItems = Array.isArray(story.deps) ? story.deps : [];
+  depsEl.innerHTML = depsItems.map(item => `
+    <div class="story-list-item">
+      <span class="list-bullet">·</span>
+      <span>${escapeHtml(item)}</span>
+    </div>
+  `).join('');
+  document.getElementById('out-deps-section').style.display = depsItems.length ? 'block' : 'none';
+
+  // Open questions
+  const openEl = document.getElementById('out-open');
+  const openItems = Array.isArray(story.open) ? story.open : [];
+  openEl.innerHTML = openItems.map(item => {
+    const text = item.replace(/^OPEN:\s*/i, '');
+    return `
+      <div class="story-list-item">
+        <span class="list-bullet" style="margin-top:2px;">⚠</span>
+        <span><span class="open-flag">OPEN</span>${escapeHtml(text)}</span>
+      </div>`;
+  }).join('');
+  document.getElementById('out-open-section').style.display = openItems.length ? 'block' : 'none';
+
+  // Tech lead confirms
+  const leadEl = document.getElementById('out-lead');
+  const leadItems = Array.isArray(story.techLead) ? story.techLead : [];
+  leadEl.innerHTML = leadItems.map((item, i) => `
+    <div class="story-list-item">
+      <span class="list-bullet" style="color:var(--green);">${i + 1}</span>
+      <span>${escapeHtml(item)}</span>
+    </div>
+  `).join('');
+  document.getElementById('out-lead-section').style.display = leadItems.length ? 'block' : 'none';
+
+  document.getElementById('gen-output').classList.add('active');
+}
+
+function resetGenerate() {
+  document.getElementById('gen-output').classList.remove('active');
+  document.getElementById('gen-input-section').style.display = 'block';
+  document.getElementById('blob-input').focus();
+}
+
+function clearGenerate() {
+  document.getElementById('blob-input').value = '';
+  document.getElementById('blob-input').dataset.base = '';
+  document.getElementById('gen-error-box').classList.remove('active');
+  document.querySelectorAll('.type-chip').forEach(c => c.classList.remove('selected'));
+  attachedFiles = [];
+  renderAttachList();
+  if (isRecording && recognition) recognition.stop();
+  clearTimeout(silenceTimer);
+  setVoiceStatus('', false);
+  document.getElementById('blob-input').focus();
+}
+
+// ==================== SHARED UTILS ====================
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+</script>
+</body>
+</html>
