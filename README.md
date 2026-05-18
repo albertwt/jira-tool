@@ -59,6 +59,16 @@ server-side and forwards the request. The key never ships to the browser.
 
 ---
 
+## Cost
+
+- **Vercel hosting** — free on the Hobby tier
+- **Claude.ai Pro** — separate from this tool; covers your claude.ai chat access only
+- **Anthropic API** — billed per token, separate from Pro. 
+  Get a key at console.anthropic.com. For personal use, expect < $2/month.
+  Each Generate or Review call ≈ $0.003–0.005 at Claude Sonnet pricing.
+
+--
+  
 ## Local development
 
 ```bash
